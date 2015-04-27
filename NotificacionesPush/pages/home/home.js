@@ -3,11 +3,9 @@
 
 
     function login() {
-        NotificacionesPushDemoClient.login("facebook").done(function(res) {
-        
-
-            NotificacionesPushDemoClient.invokeApi("usuarios",
-        {method:"get"}).done(function(resu) {
+       Servicios.login().done(function(res) {
+           Servicios.detalleFacebook()
+           .done(function(resu) {
                 var data = JSON.parse(resu.response);
                 sessionStorage.id = data.id;
                 guardarDatos(data);
@@ -22,24 +20,17 @@
     }
 
     function guardarDatos(facebook) {
-        var base_url =
-            "http://webapiusuariosfacebookpush.azurewebsites.net/api/";
-        WinJS.xhr({ url: base_url + "usuarios/" + facebook.id, type: "GET" })
-            .done(function(res) {
-                    Windows.Networking.PushNotifications.
-                        PushNotificationChannelManager.
-                        createPushNotificationChannelForApplicationAsync()
+       
+       Servicios.getUsuario(facebook.id).done(function(res) {
+                    Notificaciones.Registro()
                         .then(function(channel) {
 
                             var user = JSON.parse(res.response);
                             user.channel = channel.uri;
-                            WinJS.xhr({
-                                url: base_url + "usuarios/" + user.idFacebook,
-                                type: "put",  responseType: "json",
-                                headers: {"content-Type":"application/json"},
-                                data: JSON.stringify(user)
-                            }).done(function () {
-                                cambiarVista();
+                            Servicios.actualizarUsuario(user).
+                                done(function () {
+
+                                 cambiarVista();
                                 return NotificacionesPushDemoClient.push.
                                     registerNative(channel.uri);
 
@@ -57,16 +48,11 @@
                                 nombre: facebook.name,
                                 channel: channel.uri
                             };
-                        var dataTxt = JSON.stringify(usr);
-                            WinJS.xhr({
-                                url: base_url + "usuarios",
-                                type: "post",
-                                data: dataTxt,
-                                responseType: "json",
-                                headers: { "content-Type": "application/json" }
-                            }).done(function () {
-                                    cambiarVista();
-                                return NotificacionesPushDemoClient.push.
+                       
+                           Servicios.insertarUsuario(usr).done(function () {
+                               cambiarVista();
+
+                               return NotificacionesPushDemoClient.push.
                                     registerNative(channel.uri);
 
 
@@ -80,21 +66,25 @@
                 });
     }
 
+    function cargarCombo(usr) {
+        for (var i = 0; i < usr.length; i++) {
+            var ele = document.createElement("option");
+            ele.setAttribute("value", usr[i].idFacebook);
+            var txt = document.createTextNode(usr[i].nombre);
+            ele.appendChild(txt);
+            document.getElementById("ddlUsuario").appendChild(ele);
+        }
+
+    }
+
     function cambiarVista() {
         
-        var base_url =
-            "http://webapiusuariosfacebookpush.azurewebsites.net/api/";
-        WinJS.xhr({ url: base_url + "usuarios/", type: "GET" }).done(
+      
+       Servicios.ObtenerUsuarios().done(
             function(res) {
                 var usr = JSON.parse(res.response);
-
-                for (var i = 0; i < usr.length; i++) {
-                    var ele = document.createElement("option");
-                    ele.setAttribute("value", usr[i].idFacebook);
-                    var txt = document.createTextNode(usr[i].nombre);
-                    ele.appendChild(txt);
-                    document.getElementById("ddlUsuario").appendChild(ele);
-                }
+                cargarCombo(usr);
+                
 
                 document.getElementById("login").style.display = "none";
                 document.getElementById("mensajes").style.display = "block";
@@ -105,8 +95,7 @@
 
     }
     function enviar() {
-        var base_url =
-            "http://webapiusuariosfacebookpush.azurewebsites.net/api/";
+       
         var ddl = document.getElementById("ddlUsuario");
         var dest = ddl.options[ddl.selectedIndex].value;
         var obj = {
@@ -114,33 +103,19 @@
             idDestino: dest,
             texto: document.getElementById("txtMensaje").value
         }
-        var dataTxt = JSON.stringify(obj);
-        WinJS.xhr({
-            url: base_url + "mensajes",
-            type: "post",
-            data: dataTxt,
-            responseType: "json",
-            headers: { "content-Type": "application/json" }
-        }).done(function() {
-
-            WinJS.xhr({
-                url: base_url + "usuarios/" + dest,
-                type: "get",
-                data: dataTxt,
-                responseType: "json",
-                headers: { "content-Type": "application/json" }
-            }).done(function(res) {
-                var usuario = JSON.parse(res.response);
-                NotificacionesPushDemoClient.invokeApi("notificarmensaje",
-        { method: "post", body: { cadena: document.getElementById("txtMensaje").value, uri: "Facebook:"+dest } }).
+       
+       Servicios.enviarMensaje(obj).done(function() {
+           var mensaje = {
+               texto: obj.texto,
+               destino: "Facebook:" + dest
+           };
+       
+           Notificaciones.enviar(mensaje).
                     done(function () { }, 
                     function(error) {
                         var errorr = error;
                     });
-            }, function(err) {
-                var e = err;
-
-            });
+            
 
 
         });
